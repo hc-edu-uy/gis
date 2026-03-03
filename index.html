@@ -1,0 +1,1936 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/MarkerCluster.css">
+        <link rel="stylesheet" href="css/MarkerCluster.Default.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        </style>
+        <title></title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/multi-style-layer.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="js/leaflet.markercluster.js"></script>
+        <script src="data/HospitalCerro_1.js"></script>
+        <script src="data/HospitalMaciel_2.js"></script>
+        <script src="data/HospitalLasPiedras_3.js"></script>
+        <script src="data/HospitalPasteur_4.js"></script>
+        <script src="data/CentroDepartamentalCanelones_5.js"></script>
+        <script src="data/HospitaldeClinicas_6.js"></script>
+        <script src="data/HospitalPando_7.js"></script>
+        <script src="data/HospitalEspaol_8.js"></script>
+        <script src="data/HospitalSaintBois_9.js"></script>
+        <script src="data/TodaslasUnidades_10.js"></script>
+        <script src="data/Usuariosenelperiodo_11.js"></script>
+        <script src="data/Egresos_12.js"></script>
+        <script src="data/ConsultasEmergencia_13.js"></script>
+        <script src="data/AreasdeSalud_14.js"></script>
+        <script src="data/Departamentos_15.js"></script>
+        <script src="data/Lmite_16.js"></script>
+        <script>
+        var highlightLayer;
+        function highlightFeature(e) {
+            highlightLayer = e.target;
+            highlightLayer.openPopup();
+        }
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        }).fitBounds([[-34.87155956098754,-60.98991618290095],[-30.021369393669247,-51.07975132758076]]);
+        // NUEVO YO boton rest vary            
+        var initialBounds = L.latLngBounds(
+            [[-34.87155956098754, -60.98991618290095], [-30.021369393669247, -51.07975132758076]]
+        ); 
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        setTimeout(function () {
+    try {
+        var atc = map.attributionControl && map.attributionControl._container;
+        if (!atc) return;
+
+        // 
+        if (atc.innerHTML.indexOf('Hospital de Clínicas') !== -1) return;
+
+        var link =
+            '<a href="https://www.hc.edu.uy/" target="_blank" rel="noopener">' +
+            'Hospital de Clínicas' +
+            '</a>';
+
+        var html = atc.innerHTML;
+
+        //
+        var re = /<a\b[^>]*>\s*qgis2web\s*<\/a>/i;
+
+        if (re.test(html)) {
+            // 
+            atc.innerHTML = html.replace(re, link + ' &middot; $&');
+        } else {
+            // 
+            atc.innerHTML = link + ' &middot; ' + html;
+        }
+    } catch (e) {
+        // 
+    }
+}, 300);
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // add class to format popup if it contains media
+		function addClassToPopupIfMedia(content, popup) {
+			var tempDiv = document.createElement('div');
+			tempDiv.innerHTML = content;
+			if (tempDiv.querySelector('td img')) {
+				popup._contentNode.classList.add('media');
+					// Delay to force the redraw
+					setTimeout(function() {
+						popup.update();
+					}, 10);
+			} else {
+				popup._contentNode.classList.remove('media');
+			}
+		}
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        var measureControl = new L.Control.Measure({
+            position: 'topleft',
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        map.createPane('pane_OSMStandard_0');
+        map.getPane('pane_OSMStandard_0').style.zIndex = 400;
+        var layer_OSMStandard_0 = L.tileLayer('http://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane: 'pane_OSMStandard_0',
+            opacity: 1.0,
+            attribution: '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors, CC-BY-SA</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        layer_OSMStandard_0;
+        map.addLayer(layer_OSMStandard_0);
+        function pop_HospitalCerro_1(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_HospitalCerro_1_0() {
+            return {
+                pane: 'pane_HospitalCerro_1',
+                opacity: 1,
+                color: 'rgba(77,175,74,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_HospitalCerro_1_1() {
+            return {
+                pane: 'pane_HospitalCerro_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(139,247,92,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_HospitalCerro_1');
+        map.getPane('pane_HospitalCerro_1').style.zIndex = 401;
+        map.getPane('pane_HospitalCerro_1').style['mix-blend-mode'] = 'normal';
+        var layer_HospitalCerro_1 = new L.geoJson.multiStyle(json_HospitalCerro_1, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_HospitalCerro_1',
+            layerName: 'layer_HospitalCerro_1',
+            pane: 'pane_HospitalCerro_1',
+            onEachFeature: pop_HospitalCerro_1,
+            styles: [style_HospitalCerro_1_0,style_HospitalCerro_1_1,]
+        });
+        bounds_group.addLayer(layer_HospitalCerro_1);
+        function pop_HospitalMaciel_2(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_HospitalMaciel_2_0() {
+            return {
+                pane: 'pane_HospitalMaciel_2',
+                opacity: 1,
+                color: 'rgba(77,175,74,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_HospitalMaciel_2_1() {
+            return {
+                pane: 'pane_HospitalMaciel_2',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(139,247,92,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_HospitalMaciel_2');
+        map.getPane('pane_HospitalMaciel_2').style.zIndex = 402;
+        map.getPane('pane_HospitalMaciel_2').style['mix-blend-mode'] = 'normal';
+        var layer_HospitalMaciel_2 = new L.geoJson.multiStyle(json_HospitalMaciel_2, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_HospitalMaciel_2',
+            layerName: 'layer_HospitalMaciel_2',
+            pane: 'pane_HospitalMaciel_2',
+            onEachFeature: pop_HospitalMaciel_2,
+            styles: [style_HospitalMaciel_2_0,style_HospitalMaciel_2_1,]
+        });
+        bounds_group.addLayer(layer_HospitalMaciel_2);
+        function pop_HospitalLasPiedras_3(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_HospitalLasPiedras_3_0() {
+            return {
+                pane: 'pane_HospitalLasPiedras_3',
+                opacity: 1,
+                color: 'rgba(77,175,74,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_HospitalLasPiedras_3_1() {
+            return {
+                pane: 'pane_HospitalLasPiedras_3',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(139,247,92,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_HospitalLasPiedras_3');
+        map.getPane('pane_HospitalLasPiedras_3').style.zIndex = 403;
+        map.getPane('pane_HospitalLasPiedras_3').style['mix-blend-mode'] = 'normal';
+        var layer_HospitalLasPiedras_3 = new L.geoJson.multiStyle(json_HospitalLasPiedras_3, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_HospitalLasPiedras_3',
+            layerName: 'layer_HospitalLasPiedras_3',
+            pane: 'pane_HospitalLasPiedras_3',
+            onEachFeature: pop_HospitalLasPiedras_3,
+            styles: [style_HospitalLasPiedras_3_0,style_HospitalLasPiedras_3_1,]
+        });
+        bounds_group.addLayer(layer_HospitalLasPiedras_3);
+        function pop_HospitalPasteur_4(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_HospitalPasteur_4_0() {
+            return {
+                pane: 'pane_HospitalPasteur_4',
+                opacity: 1,
+                color: 'rgba(77,175,74,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_HospitalPasteur_4_1() {
+            return {
+                pane: 'pane_HospitalPasteur_4',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(139,247,92,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_HospitalPasteur_4');
+        map.getPane('pane_HospitalPasteur_4').style.zIndex = 404;
+        map.getPane('pane_HospitalPasteur_4').style['mix-blend-mode'] = 'normal';
+        var layer_HospitalPasteur_4 = new L.geoJson.multiStyle(json_HospitalPasteur_4, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_HospitalPasteur_4',
+            layerName: 'layer_HospitalPasteur_4',
+            pane: 'pane_HospitalPasteur_4',
+            onEachFeature: pop_HospitalPasteur_4,
+            styles: [style_HospitalPasteur_4_0,style_HospitalPasteur_4_1,]
+        });
+        bounds_group.addLayer(layer_HospitalPasteur_4);
+        function pop_CentroDepartamentalCanelones_5(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_CentroDepartamentalCanelones_5_0() {
+            return {
+                pane: 'pane_CentroDepartamentalCanelones_5',
+                opacity: 1,
+                color: 'rgba(77,175,74,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_CentroDepartamentalCanelones_5_1() {
+            return {
+                pane: 'pane_CentroDepartamentalCanelones_5',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(139,247,92,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_CentroDepartamentalCanelones_5');
+        map.getPane('pane_CentroDepartamentalCanelones_5').style.zIndex = 405;
+        map.getPane('pane_CentroDepartamentalCanelones_5').style['mix-blend-mode'] = 'normal';
+        var layer_CentroDepartamentalCanelones_5 = new L.geoJson.multiStyle(json_CentroDepartamentalCanelones_5, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_CentroDepartamentalCanelones_5',
+            layerName: 'layer_CentroDepartamentalCanelones_5',
+            pane: 'pane_CentroDepartamentalCanelones_5',
+            onEachFeature: pop_CentroDepartamentalCanelones_5,
+            styles: [style_CentroDepartamentalCanelones_5_0,style_CentroDepartamentalCanelones_5_1,]
+        });
+        bounds_group.addLayer(layer_CentroDepartamentalCanelones_5);
+        function pop_HospitaldeClinicas_6(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_HospitaldeClinicas_6_0() {
+            return {
+                pane: 'pane_HospitaldeClinicas_6',
+                opacity: 1,
+                color: 'rgba(53,121,177,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_HospitaldeClinicas_6_1() {
+            return {
+                pane: 'pane_HospitaldeClinicas_6',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(79,179,255,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_HospitaldeClinicas_6');
+        map.getPane('pane_HospitaldeClinicas_6').style.zIndex = 406;
+        map.getPane('pane_HospitaldeClinicas_6').style['mix-blend-mode'] = 'normal';
+        var layer_HospitaldeClinicas_6 = new L.geoJson.multiStyle(json_HospitaldeClinicas_6, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_HospitaldeClinicas_6',
+            layerName: 'layer_HospitaldeClinicas_6',
+            pane: 'pane_HospitaldeClinicas_6',
+            onEachFeature: pop_HospitaldeClinicas_6,
+            styles: [style_HospitaldeClinicas_6_0,style_HospitaldeClinicas_6_1,]
+        });
+        bounds_group.addLayer(layer_HospitaldeClinicas_6);
+        function pop_HospitalPando_7(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_HospitalPando_7_0() {
+            return {
+                pane: 'pane_HospitalPando_7',
+                opacity: 1,
+                color: 'rgba(53,121,177,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_HospitalPando_7_1() {
+            return {
+                pane: 'pane_HospitalPando_7',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(79,179,255,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_HospitalPando_7');
+        map.getPane('pane_HospitalPando_7').style.zIndex = 407;
+        map.getPane('pane_HospitalPando_7').style['mix-blend-mode'] = 'normal';
+        var layer_HospitalPando_7 = new L.geoJson.multiStyle(json_HospitalPando_7, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_HospitalPando_7',
+            layerName: 'layer_HospitalPando_7',
+            pane: 'pane_HospitalPando_7',
+            onEachFeature: pop_HospitalPando_7,
+            styles: [style_HospitalPando_7_0,style_HospitalPando_7_1,]
+        });
+        bounds_group.addLayer(layer_HospitalPando_7);
+        function pop_HospitalEspaol_8(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_HospitalEspaol_8_0() {
+            return {
+                pane: 'pane_HospitalEspaol_8',
+                opacity: 1,
+                color: 'rgba(53,121,177,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_HospitalEspaol_8_1() {
+            return {
+                pane: 'pane_HospitalEspaol_8',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(79,179,255,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_HospitalEspaol_8');
+        map.getPane('pane_HospitalEspaol_8').style.zIndex = 408;
+        map.getPane('pane_HospitalEspaol_8').style['mix-blend-mode'] = 'normal';
+        var layer_HospitalEspaol_8 = new L.geoJson.multiStyle(json_HospitalEspaol_8, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_HospitalEspaol_8',
+            layerName: 'layer_HospitalEspaol_8',
+            pane: 'pane_HospitalEspaol_8',
+            onEachFeature: pop_HospitalEspaol_8,
+            styles: [style_HospitalEspaol_8_0,style_HospitalEspaol_8_1,]
+        });
+        bounds_group.addLayer(layer_HospitalEspaol_8);
+        function pop_HospitalSaintBois_9(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_HospitalSaintBois_9_0() {
+            return {
+                pane: 'pane_HospitalSaintBois_9',
+                opacity: 1,
+                color: 'rgba(53,121,177,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        function style_HospitalSaintBois_9_1() {
+            return {
+                pane: 'pane_HospitalSaintBois_9',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 0.2,
+                fillColor: 'rgba(79,179,255,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_HospitalSaintBois_9');
+        map.getPane('pane_HospitalSaintBois_9').style.zIndex = 409;
+        map.getPane('pane_HospitalSaintBois_9').style['mix-blend-mode'] = 'normal';
+        var layer_HospitalSaintBois_9 = new L.geoJson.multiStyle(json_HospitalSaintBois_9, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_HospitalSaintBois_9',
+            layerName: 'layer_HospitalSaintBois_9',
+            pane: 'pane_HospitalSaintBois_9',
+            onEachFeature: pop_HospitalSaintBois_9,
+            styles: [style_HospitalSaintBois_9_0,style_HospitalSaintBois_9_1,]
+        });
+        bounds_group.addLayer(layer_HospitalSaintBois_9);
+        function pop_TodaslasUnidades_10(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">NOMBRE</th>\
+                        <td>' + (feature.properties['NOMBRE'] !== null ? autolinker.link(String(feature.properties['NOMBRE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">DEPARTAMENTO</th>\
+                        <td>' + (feature.properties['DEPARTAMENTO'] !== null ? autolinker.link(String(feature.properties['DEPARTAMENTO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">LOCALIDAD</th>\
+                        <td>' + (feature.properties['LOCALIDAD'] !== null ? autolinker.link(String(feature.properties['LOCALIDAD']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">REGION</th>\
+                        <td>' + (feature.properties['REGION'] !== null ? autolinker.link(String(feature.properties['REGION']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">CATEGORIA</th>\
+                        <td>' + (feature.properties['CATEGORIA'] !== null ? autolinker.link(String(feature.properties['CATEGORIA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">ZONA DE REFERENCIA</th>\
+                        <td>' + (feature.properties['ZONA DE REFERENCIA'] !== null ? autolinker.link(String(feature.properties['ZONA DE REFERENCIA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">EGRESOS POR MODALIDAD</th>\
+                        <td>' + (feature.properties['EGRESOS POR MODALIDAD'] !== null ? autolinker.link(String(feature.properties['EGRESOS POR MODALIDAD']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">CONSULTAS EMERGENCIA</th>\
+                        <td>' + (feature.properties['CONSULTAS EMERGENCIA'] !== null ? autolinker.link(String(feature.properties['CONSULTAS EMERGENCIA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">C/ EMERGENCIA POR USUARIO</th>\
+                        <td>' + (feature.properties['C/ EMERGENCIA POR USUARIO'] !== null ? autolinker.link(String(feature.properties['C/ EMERGENCIA POR USUARIO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">EGRESOS/USUARIO</th>\
+                        <td>' + (feature.properties['EGRESOS/USUARIO'] !== null ? autolinker.link(String(feature.properties['EGRESOS/USUARIO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">CANTIDAD USUARIOS EN EL PERIODO</th>\
+                        <td>' + (feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] !== null ? autolinker.link(String(feature.properties['CANTIDAD USUARIOS EN EL PERIODO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_TodaslasUnidades_10_0() {
+            return {
+                pane: 'pane_TodaslasUnidades_10',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/TodaslasUnidades_10.svg',
+            iconSize: [14.44, 14.44]
+        }),
+                interactive: true,
+            }
+        }
+        map.createPane('pane_TodaslasUnidades_10');
+        map.getPane('pane_TodaslasUnidades_10').style.zIndex = 410;
+        map.getPane('pane_TodaslasUnidades_10').style['mix-blend-mode'] = 'normal';
+        var layer_TodaslasUnidades_10 = new L.geoJson(json_TodaslasUnidades_10, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_TodaslasUnidades_10',
+            layerName: 'layer_TodaslasUnidades_10',
+            pane: 'pane_TodaslasUnidades_10',
+            onEachFeature: pop_TodaslasUnidades_10,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_TodaslasUnidades_10_0(feature));
+            },
+        });
+        var cluster_TodaslasUnidades_10 = new L.MarkerClusterGroup({showCoverageOnHover: false,
+            spiderfyDistanceMultiplier: 2});
+        cluster_TodaslasUnidades_10.addLayer(layer_TodaslasUnidades_10);
+
+        bounds_group.addLayer(layer_TodaslasUnidades_10);
+        function pop_Usuariosenelperiodo_11(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">NOMBRE</th>\
+                        <td>' + (feature.properties['NOMBRE'] !== null ? autolinker.link(String(feature.properties['NOMBRE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">DEPARTAMENTO</th>\
+                        <td>' + (feature.properties['DEPARTAMENTO'] !== null ? autolinker.link(String(feature.properties['DEPARTAMENTO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">CANTIDAD USUARIOS EN EL PERIODO</th>\
+                        <td>' + (feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] !== null ? autolinker.link(String(feature.properties['CANTIDAD USUARIOS EN EL PERIODO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Usuariosenelperiodo_11_0(feature) {
+            if (feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] >= 1.000000 && feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] <= 32.000000 ) {
+                return {
+                pane: 'pane_Usuariosenelperiodo_11',
+                radius: 2.0,
+                opacity: 1,
+                color: 'rgba(128,17,25,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(219,30,42,1.0)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] >= 32.000000 && feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] <= 130.000000 ) {
+                return {
+                pane: 'pane_Usuariosenelperiodo_11',
+                radius: 5.5,
+                opacity: 1,
+                color: 'rgba(128,17,25,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(219,30,42,1.0)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] >= 130.000000 && feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] <= 394.000000 ) {
+                return {
+                pane: 'pane_Usuariosenelperiodo_11',
+                radius: 9.0,
+                opacity: 1,
+                color: 'rgba(128,17,25,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(219,30,42,1.0)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] >= 394.000000 && feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] <= 734.000000 ) {
+                return {
+                pane: 'pane_Usuariosenelperiodo_11',
+                radius: 12.5,
+                opacity: 1,
+                color: 'rgba(128,17,25,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(219,30,42,1.0)',
+                interactive: true,
+            }
+            }
+            if (feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] >= 734.000000 && feature.properties['CANTIDAD USUARIOS EN EL PERIODO'] <= 1156.000000 ) {
+                return {
+                pane: 'pane_Usuariosenelperiodo_11',
+                radius: 16.0,
+                opacity: 1,
+                color: 'rgba(128,17,25,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(219,30,42,1.0)',
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_Usuariosenelperiodo_11');
+        map.getPane('pane_Usuariosenelperiodo_11').style.zIndex = 411;
+        map.getPane('pane_Usuariosenelperiodo_11').style['mix-blend-mode'] = 'normal';
+        var layer_Usuariosenelperiodo_11 = new L.geoJson(json_Usuariosenelperiodo_11, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Usuariosenelperiodo_11',
+            layerName: 'layer_Usuariosenelperiodo_11',
+            pane: 'pane_Usuariosenelperiodo_11',
+            onEachFeature: pop_Usuariosenelperiodo_11,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Usuariosenelperiodo_11_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Usuariosenelperiodo_11);
+        function pop_Egresos_12(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">NOMBRE</th>\
+                        <td>' + (feature.properties['NOMBRE'] !== null ? autolinker.link(String(feature.properties['NOMBRE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">ZONA DE REFERENCIA</th>\
+                        <td>' + (feature.properties['ZONA DE REFERENCIA'] !== null ? autolinker.link(String(feature.properties['ZONA DE REFERENCIA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">EGRESOS POR MODALIDAD</th>\
+                        <td>' + (feature.properties['EGRESOS POR MODALIDAD'] !== null ? autolinker.link(String(feature.properties['EGRESOS POR MODALIDAD']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">EGRESOS/USUARIO</th>\
+                        <td>' + (feature.properties['EGRESOS/USUARIO'] !== null ? autolinker.link(String(feature.properties['EGRESOS/USUARIO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Egresos_12_0(feature) {
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 0.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 0.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [3.8, 3.8]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 0.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 1.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [5.199996, 5.199996]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 1.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 2.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [6.599991999999999, 6.599991999999999]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 2.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 4.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [7.999987999999999, 7.999987999999999]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 4.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 6.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [9.399984, 9.399984]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 6.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 8.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [10.800018, 10.800018]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 8.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 10.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [12.200014, 12.200014]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 10.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 13.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [13.60001, 13.60001]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 13.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 15.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [15.000005999999999, 15.000005999999999]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 15.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 20.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [16.400001999999997, 16.400001999999997]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 20.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 26.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [17.799998, 17.799998]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 26.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 31.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [19.199993999999997, 19.199993999999997]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 31.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 37.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [20.59999, 20.59999]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 37.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 45.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [21.999985999999996, 21.999985999999996]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 45.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 59.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [23.399981999999998, 23.399981999999998]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 59.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 75.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [24.800016, 24.800016]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 75.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 92.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [26.200011999999997, 26.200011999999997]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 92.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 143.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [27.600008, 27.600008]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 143.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 156.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [29.000003999999997, 29.000003999999997]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['EGRESOS POR MODALIDAD'] >= 156.000000 && feature.properties['EGRESOS POR MODALIDAD'] <= 178.000000 ) {
+                return {
+                pane: 'pane_Egresos_12',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/Egresos_12.svg',
+            iconSize: [30.4, 30.4]
+        }),
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_Egresos_12');
+        map.getPane('pane_Egresos_12').style.zIndex = 412;
+        map.getPane('pane_Egresos_12').style['mix-blend-mode'] = 'normal';
+        var layer_Egresos_12 = new L.geoJson(json_Egresos_12, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Egresos_12',
+            layerName: 'layer_Egresos_12',
+            pane: 'pane_Egresos_12',
+            onEachFeature: pop_Egresos_12,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_Egresos_12_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Egresos_12);
+        function pop_ConsultasEmergencia_13(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">NOMBRE</th>\
+                        <td>' + (feature.properties['NOMBRE'] !== null ? autolinker.link(String(feature.properties['NOMBRE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">ZONA DE REFERENCIA</th>\
+                        <td>' + (feature.properties['ZONA DE REFERENCIA'] !== null ? autolinker.link(String(feature.properties['ZONA DE REFERENCIA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">CONSULTAS EMERGENCIA</th>\
+                        <td>' + (feature.properties['CONSULTAS EMERGENCIA'] !== null ? autolinker.link(String(feature.properties['CONSULTAS EMERGENCIA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">C/ EMERGENCIA POR USUARIO</th>\
+                        <td>' + (feature.properties['C/ EMERGENCIA POR USUARIO'] !== null ? autolinker.link(String(feature.properties['C/ EMERGENCIA POR USUARIO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_ConsultasEmergencia_13_0(feature) {
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 0.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 3.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [3.8, 3.8]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 3.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 7.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [5.199996, 5.199996]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 7.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 11.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [6.599991999999999, 6.599991999999999]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 11.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 15.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [7.999987999999999, 7.999987999999999]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 15.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 21.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [9.399984, 9.399984]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 21.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 31.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [10.800018, 10.800018]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 31.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 40.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [12.200014, 12.200014]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 40.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 47.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [13.60001, 13.60001]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 47.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 53.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [15.000005999999999, 15.000005999999999]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 53.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 60.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [16.400001999999997, 16.400001999999997]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 60.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 81.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [17.799998, 17.799998]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 81.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 114.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [19.199993999999997, 19.199993999999997]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 114.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 141.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [20.59999, 20.59999]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 141.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 261.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [21.999985999999996, 21.999985999999996]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 261.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 331.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [23.399981999999998, 23.399981999999998]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 331.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 406.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [24.800016, 24.800016]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 406.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 546.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [26.200011999999997, 26.200011999999997]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 546.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 610.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [27.600008, 27.600008]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 610.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 900.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [29.000003999999997, 29.000003999999997]
+        }),
+                interactive: true,
+            }
+            }
+            if (feature.properties['CONSULTAS EMERGENCIA'] >= 900.000000 && feature.properties['CONSULTAS EMERGENCIA'] <= 1444.000000 ) {
+                return {
+                pane: 'pane_ConsultasEmergencia_13',
+        rotationAngle: 0.0,
+        rotationOrigin: 'center center',
+        icon: L.icon({
+            iconUrl: 'markers/ConsultasEmergencia_13.svg',
+            iconSize: [30.4, 30.4]
+        }),
+                interactive: true,
+            }
+            }
+        }
+        map.createPane('pane_ConsultasEmergencia_13');
+        map.getPane('pane_ConsultasEmergencia_13').style.zIndex = 413;
+        map.getPane('pane_ConsultasEmergencia_13').style['mix-blend-mode'] = 'normal';
+        var layer_ConsultasEmergencia_13 = new L.geoJson(json_ConsultasEmergencia_13, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_ConsultasEmergencia_13',
+            layerName: 'layer_ConsultasEmergencia_13',
+            pane: 'pane_ConsultasEmergencia_13',
+            onEachFeature: pop_ConsultasEmergencia_13,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.marker(latlng, style_ConsultasEmergencia_13_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_ConsultasEmergencia_13);
+        function pop_AreasdeSalud_14(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_AreasdeSalud_14_0() {
+            return {
+                pane: 'pane_AreasdeSalud_14',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(196,60,57,0.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_AreasdeSalud_14');
+        map.getPane('pane_AreasdeSalud_14').style.zIndex = 414;
+        map.getPane('pane_AreasdeSalud_14').style['mix-blend-mode'] = 'normal';
+        var layer_AreasdeSalud_14 = new L.geoJson(json_AreasdeSalud_14, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_AreasdeSalud_14',
+            layerName: 'layer_AreasdeSalud_14',
+            pane: 'pane_AreasdeSalud_14',
+            onEachFeature: pop_AreasdeSalud_14,
+            style: style_AreasdeSalud_14_0,
+        });
+        bounds_group.addLayer(layer_AreasdeSalud_14);
+        function pop_Departamentos_15(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Departamentos_15_0() {
+            return {
+                pane: 'pane_Departamentos_15',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(243,166,178,0.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_Departamentos_15');
+        map.getPane('pane_Departamentos_15').style.zIndex = 415;
+        map.getPane('pane_Departamentos_15').style['mix-blend-mode'] = 'normal';
+        var layer_Departamentos_15 = new L.geoJson(json_Departamentos_15, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_Departamentos_15',
+            layerName: 'layer_Departamentos_15',
+            pane: 'pane_Departamentos_15',
+            onEachFeature: pop_Departamentos_15,
+            style: style_Departamentos_15_0,
+        });
+        bounds_group.addLayer(layer_Departamentos_15);
+        function pop_Lmite_16(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Lmite_16_0() {
+            return {
+                pane: 'pane_Lmite_16',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 3.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(232,113,141,0.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_Lmite_16');
+        map.getPane('pane_Lmite_16').style.zIndex = 416;
+        map.getPane('pane_Lmite_16').style['mix-blend-mode'] = 'normal';
+        var layer_Lmite_16 = new L.geoJson(json_Lmite_16, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_Lmite_16',
+            layerName: 'layer_Lmite_16',
+            pane: 'pane_Lmite_16',
+            onEachFeature: pop_Lmite_16,
+            style: style_Lmite_16_0,
+        });
+        bounds_group.addLayer(layer_Lmite_16);
+        const url = {"Nominatim": "https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",
+        "BAN": "https://api-adresse.data.gouv.fr/search/?"}
+        var photonControl = L.control.photon({
+            url: url["Nominatim"],
+            feedbackLabel: '',
+            position: 'topleft',
+            includePosition: true,
+            initial: true,
+            // resultsHandler: myHandler,
+        }).addTo(map);
+        photonControl._container.childNodes[0].style.borderRadius="10px"
+        // Create a variable to store the geoJSON data
+        var x = null;
+        // Create a variable to store the marker
+        var marker = null;
+        // Add an event listener to the Photon control to create a marker from the returned geoJSON data
+        var z = null;
+        photonControl.on('selected', function(e) {
+            console.log(photonControl.search.resultsContainer);
+            if (x != null) {
+                map.removeLayer(obj3.marker);
+                map.removeLayer(x);
+            }
+            obj2.gcd = e.choice;
+            x = L.geoJSON(obj2.gcd).addTo(map);
+            var label = typeof obj2.gcd.properties.label === 'undefined' ? obj2.gcd.properties.display_name : obj2.gcd.properties.label;
+            obj3.marker = L.marker(x.getLayers()[0].getLatLng()).bindPopup(label).addTo(map);
+            map.setView(x.getLayers()[0].getLatLng(), 17);
+            z = typeof e.choice.properties.label === 'undefined'? e.choice.properties.display_name : e.choice.properties.label;
+            console.log(e);
+            e.target.input.value = z;
+        });
+        var search = document.getElementsByClassName("leaflet-photon leaflet-control")[0];
+        search.classList.add("leaflet-control-search")
+        search.style.display = "flex";
+        search.style.backgroundColor="rgba(255,255,255,0.5)" 
+
+        // Créer le nouvel élément bouton
+        var button = document.createElement("div");
+        button.id = "gcd-button-control";
+        button.className = "gcd-gl-btn fa fa-search search-button";
+
+        // Ajouter le bouton à l'élément parent
+        search.insertBefore(button, search.firstChild);
+        last = search.lastChild;
+        last.style.display = "none";
+        button.addEventListener("click", function (e) {
+            if (last.style.display === "none") {
+                last.style.display = "block";
+            } else {
+                last.style.display = "none";
+            }
+        });
+        // clk off
+       
+        var clickMarker = null;
+
+        function formatLatLng(latlng) {
+            return latlng.lat.toFixed(6) + ", " + latlng.lng.toFixed(6);
+        }
+
+        map.on("click", function (e) {
+            
+            if (clickMarker) {
+                map.removeLayer(clickMarker);
+                clickMarker = null;
+            }
+            var txt = formatLatLng(e.latlng);
+            clickMarker = L.marker(e.latlng, { interactive: true })
+                .addTo(map)
+                .bindPopup("<b>Coordenadas</b><br>" + txt)
+                .openPopup();
+            // Click off
+            clickMarker.on("click", function (ev) {
+                if (clickMarker) {
+                    map.removeLayer(clickMarker);
+                    clickMarker = null;
+                }
+                L.DomEvent.stop(ev);
+            });
+        });
+
+        
+        // home_reset
+        
+        var ResetViewControl = L.Control.extend({
+            options: { position: "topleft" },
+
+            onAdd: function () {
+                var container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+                var a = L.DomUtil.create("a", "", container);
+
+                a.href = "#";
+                a.title = "Restablecer mapa";
+                a.setAttribute("aria-label", "Restablecer mapa");
+                a.innerHTML = '<i class="fas fa-home"></i>'; // icono home
+
+                L.DomEvent.on(a, "click", function (ev) {
+                    L.DomEvent.stop(ev);
+
+                    // markoff
+                    if (clickMarker) {
+                        map.removeLayer(clickMarker);
+                        clickMarker = null;
+                    }
+
+                    // reset search
+                    try {
+                        if (x) {
+                            map.removeLayer(x);
+                            x = null;
+                        }
+                    } catch (e) {}
+
+                    try {
+                        if (typeof obj3 !== "undefined" && obj3.marker) {
+                            map.removeLayer(obj3.marker);
+                            obj3.marker = null;
+                        }
+                    } catch (e) {}
+
+                    // cll
+                    try {
+                        if (photonControl && photonControl._input) {
+                            photonControl._input.value = "";
+                        }
+                    } catch (e) {}
+
+                    // reset
+                    map.fitBounds(initialBounds);
+                });
+
+                return container;
+            },
+        });
+
+        map.addControl(new ResetViewControl());
+        var overlaysTree = [
+        {label: '<b>URUGUAY</b>', collapsed: true, selectAllCheckbox: true, children: [
+            {label: '<img src="legend/Lmite_16.png" /> Límite', layer: layer_Lmite_16},
+            {label: '<img src="legend/Departamentos_15.png" /> Departamentos', layer: layer_Departamentos_15},]},
+        {label: '<b>AREAS DE SALUD</b>', collapsed: true, selectAllCheckbox: true, children: [
+            {label: '<img src="legend/AreasdeSalud_14.png" /> Areas de Salud', layer: layer_AreasdeSalud_14},]},
+        {label: '<b>ACTIVIDAD 01-02/2026</b>', collapsed: true, selectAllCheckbox: true, children: [
+            {label: 'Consultas Emergencia<br /><table><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_030.png" /></td><td>0 - 3</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_371.png" /></td><td>3 - 7</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_7112.png" /></td><td>7 - 11</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_11153.png" /></td><td>11 - 15</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_15214.png" /></td><td>15 - 21</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_21315.png" /></td><td>21 - 31</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_31406.png" /></td><td>31 - 40</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_40477.png" /></td><td>40 - 47</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_47538.png" /></td><td>47 - 53</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_53609.png" /></td><td>53 - 60</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_608110.png" /></td><td>60 - 81</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_8111411.png" /></td><td>81 - 114</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_11414112.png" /></td><td>114 - 141</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_14126113.png" /></td><td>141 - 261</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_26133114.png" /></td><td>261 - 331</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_33140615.png" /></td><td>331 - 406</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_40654616.png" /></td><td>406 - 546</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_54661017.png" /></td><td>546 - 610</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_61090018.png" /></td><td>610 - 900</td></tr><tr><td style="text-align: center;"><img src="legend/ConsultasEmergencia_13_900144419.png" /></td><td>900 - 1444</td></tr></table>', layer: layer_ConsultasEmergencia_13},
+            {label: 'Egresos<br /><table><tr><td style="text-align: center;"><img src="legend/Egresos_12_000.png" /></td><td>0 - 0</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_011.png" /></td><td>0 - 1</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_122.png" /></td><td>1 - 2</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_243.png" /></td><td>2 - 4</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_464.png" /></td><td>4 - 6</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_685.png" /></td><td>6 - 8</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_8106.png" /></td><td>8 - 10</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_10137.png" /></td><td>10 - 13</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_13158.png" /></td><td>13 - 15</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_15209.png" /></td><td>15 - 20</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_202610.png" /></td><td>20 - 26</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_263111.png" /></td><td>26 - 31</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_313712.png" /></td><td>31 - 37</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_374513.png" /></td><td>37 - 45</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_455914.png" /></td><td>45 - 59</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_597515.png" /></td><td>59 - 75</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_759216.png" /></td><td>75 - 92</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_9214317.png" /></td><td>92 - 143</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_14315618.png" /></td><td>143 - 156</td></tr><tr><td style="text-align: center;"><img src="legend/Egresos_12_15617819.png" /></td><td>156 - 178</td></tr></table>', layer: layer_Egresos_12},
+            {label: 'Usuarios en el periodo<br /><table><tr><td style="text-align: center;"><img src="legend/Usuariosenelperiodo_11_1320.png" /></td><td>1 - 32</td></tr><tr><td style="text-align: center;"><img src="legend/Usuariosenelperiodo_11_321301.png" /></td><td>32 - 130</td></tr><tr><td style="text-align: center;"><img src="legend/Usuariosenelperiodo_11_1303942.png" /></td><td>130 - 394</td></tr><tr><td style="text-align: center;"><img src="legend/Usuariosenelperiodo_11_3947343.png" /></td><td>394 - 734</td></tr><tr><td style="text-align: center;"><img src="legend/Usuariosenelperiodo_11_73411564.png" /></td><td>734 - 1156</td></tr></table>', layer: layer_Usuariosenelperiodo_11},]},
+        {label: '<b>UNIDADES ASISTENCIALES</b>', collapsed: true, selectAllCheckbox: true, children: [
+            {label: '<img src="legend/TodaslasUnidades_10.png" /> Todas las Unidades', layer: cluster_TodaslasUnidades_10},]},
+        {label: '<b>SNA/TNA REGION SUR</b>', collapsed: true, selectAllCheckbox: true, children: [
+            {label: '<img src="legend/HospitalSaintBois_9.png" /> Hospital Saint Bois', layer: layer_HospitalSaintBois_9},
+            {label: '<img src="legend/HospitalEspaol_8.png" /> Hospital Español', layer: layer_HospitalEspaol_8},
+            {label: '<img src="legend/HospitalPando_7.png" /> Hospital Pando', layer: layer_HospitalPando_7},
+            {label: '<img src="legend/HospitaldeClinicas_6.png" /> Hospital de Clinicas', layer: layer_HospitaldeClinicas_6},
+            {label: '<img src="legend/CentroDepartamentalCanelones_5.png" /> Centro Departamental Canelones', layer: layer_CentroDepartamentalCanelones_5},
+            {label: '<img src="legend/HospitalPasteur_4.png" /> Hospital Pasteur', layer: layer_HospitalPasteur_4},
+            {label: '<img src="legend/HospitalLasPiedras_3.png" /> Hospital Las Piedras', layer: layer_HospitalLasPiedras_3},
+            {label: '<img src="legend/HospitalMaciel_2.png" /> Hospital Maciel', layer: layer_HospitalMaciel_2},
+            {label: '<img src="legend/HospitalCerro_1.png" /> Hospital Cerro', layer: layer_HospitalCerro_1},]},
+            {label: "OSM Standard", layer: layer_OSMStandard_0, radioGroup: 'bm' },]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: false, 
+        });
+        lay.addTo(map);
+		document.addEventListener("DOMContentLoaded", function() {
+            // set new Layers List height which considers toggle icon
+            function newLayersListHeight() {
+                var layerScrollbarElement = document.querySelector('.leaflet-control-layers-scrollbar');
+                if (layerScrollbarElement) {
+                    var layersListElement = document.querySelector('.leaflet-control-layers-list');
+                    var originalHeight = layersListElement.style.height 
+                        || window.getComputedStyle(layersListElement).height;
+                    var newHeight = parseFloat(originalHeight) - 50;
+                    layersListElement.style.height = newHeight + 'px';
+                }
+            }
+            var isLayersListExpanded = true;
+            var controlLayersElement = document.querySelector('.leaflet-control-layers');
+            var toggleLayerControl = document.querySelector('.leaflet-control-layers-toggle');
+            // toggle Collapsed/Expanded and apply new Layers List height
+            toggleLayerControl.addEventListener('click', function() {
+                if (isLayersListExpanded) {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                } else {
+                    controlLayersElement.classList.add('leaflet-control-layers-expanded');
+                }
+                isLayersListExpanded = !isLayersListExpanded;
+                newLayersListHeight()
+            });	
+			// apply new Layers List height if toggle layerstree
+			if (controlLayersElement) {
+				controlLayersElement.addEventListener('click', function(event) {
+					var toggleLayerHeaderPointer = event.target.closest('.leaflet-layerstree-header-pointer span');
+					if (toggleLayerHeaderPointer) {
+						newLayersListHeight();
+					}
+				});
+			}
+            // Collapsed/Expanded at Start to apply new height
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            // Collapsed touch/small screen
+            var isSmallScreen = window.innerWidth < 650;
+            if (isSmallScreen) {
+                setTimeout(function() {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                    isLayersListExpanded = !isLayersListExpanded;
+                }, 500);
+            }  
+        });       
+        setBounds();
+        </script>
+    </body>
+</html>
