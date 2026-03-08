@@ -1727,21 +1727,51 @@
         var marker = null;
         // Add an event listener to the Photon control to create a marker from the returned geoJSON data
         var z = null;
-        photonControl.on('selected', function(e) {
+                photonControl.on('selected', function(e) {
             console.log(photonControl.search.resultsContainer);
+
             if (x != null) {
                 map.removeLayer(obj3.marker);
                 map.removeLayer(x);
             }
+
             obj2.gcd = e.choice;
             x = L.geoJSON(obj2.gcd).addTo(map);
-            var label = typeof obj2.gcd.properties.label === 'undefined' ? obj2.gcd.properties.display_name : obj2.gcd.properties.label;
-            obj3.marker = L.marker(x.getLayers()[0].getLatLng()).bindPopup(label).addTo(map);
+
+            var label = typeof obj2.gcd.properties.label === 'undefined'
+                ? obj2.gcd.properties.display_name
+                : obj2.gcd.properties.label;
+
+            obj3.marker = L.marker(x.getLayers()[0].getLatLng())
+                .bindPopup(label)
+                .addTo(map)
+                .openPopup();
+
+            // click sobre el marcador de búsqueda = borrarlo
+            obj3.marker.on('click', function(ev) {
+                if (obj3.marker) {
+                    map.removeLayer(obj3.marker);
+                    obj3.marker = null;
+                }
+
+                if (x) {
+                    map.removeLayer(x);
+                    x = null;
+                }
+
+                L.DomEvent.stop(ev);
+            });
+
             map.setView(x.getLayers()[0].getLatLng(), 17);
-            z = typeof e.choice.properties.label === 'undefined'? e.choice.properties.display_name : e.choice.properties.label;
+
+            z = typeof e.choice.properties.label === 'undefined'
+                ? e.choice.properties.display_name
+                : e.choice.properties.label;
+
             console.log(e);
             e.target.input.value = z;
         });
+        
         var search = document.getElementsByClassName("leaflet-photon leaflet-control")[0];
         search.classList.add("leaflet-control-search")
         search.style.display = "flex";
