@@ -1762,35 +1762,7 @@
             } else {
                 last.style.display = "none";
             }
-        });
-        // clk off
-       
-        var clickMarker = null;
-
-        function formatLatLng(latlng) {
-            return latlng.lat.toFixed(6) + ", " + latlng.lng.toFixed(6);
-        }
-
-        map.on("click", function (e) {
-            
-            if (clickMarker) {
-                map.removeLayer(clickMarker);
-                clickMarker = null;
-            }
-            var txt = formatLatLng(e.latlng);
-            clickMarker = L.marker(e.latlng, { interactive: true })
-                .addTo(map)
-                .bindPopup("<b>Coordenadas</b><br>" + txt)
-                .openPopup();
-            // Click off
-            clickMarker.on("click", function (ev) {
-                if (clickMarker) {
-                    map.removeLayer(clickMarker);
-                    clickMarker = null;
-                }
-                L.DomEvent.stop(ev);
-            });
-        });
+        });      
 
         
         // home_reset
@@ -1808,15 +1780,8 @@
                 a.innerHTML = '<i class="fas fa-home"></i>'; // icono home
 
                 L.DomEvent.on(a, "click", function (ev) {
-                    L.DomEvent.stop(ev);
-
-                    // markoff
-                    if (clickMarker) {
-                        map.removeLayer(clickMarker);
-                        clickMarker = null;
-                    }
-
-                    // reset search
+                    L.DomEvent.stop(ev);                    
+                    // reset busquedas
                     try {
                         if (x) {
                             map.removeLayer(x);
@@ -1838,7 +1803,7 @@
                         }
                     } catch (e) {}
 
-                    // reset
+                    // reset zoom
                     map.fitBounds(initialBounds);
                 });
 
